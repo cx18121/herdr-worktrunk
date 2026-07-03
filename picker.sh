@@ -26,11 +26,15 @@ fi
 plugin_root=${HERDR_PLUGIN_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}
 # shellcheck source=./config.sh
 source "$plugin_root/config.sh"
+# shellcheck source=./helpers.sh
+source "$plugin_root/helpers.sh"
 open_mode=$(worktrunk_open_mode)
 
-# Existing local branch → switch (wt creates the worktree if it doesn't exist yet);
-# anything else is a new branch → create it.
-if git show-ref --quiet --verify "refs/heads/$name"; then
+# Existing local branch → switch (wt creates the worktree if it doesn't exist yet).
+# worktrunk shortcuts (^ default, - previous, pr:N/mr:N, PR/MR URL) are resolved
+# by worktrunk itself, so pass them through as-is — never --create.
+# Anything else is a new branch → create it.
+if worktrunk_is_shortcut "$name" || git show-ref --quiet --verify "refs/heads/$name"; then
   wtargs=(switch "$name")
 else
   wtargs=(switch --create "$name")
