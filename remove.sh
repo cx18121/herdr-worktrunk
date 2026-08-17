@@ -19,9 +19,9 @@ if [[ -z $cands ]]; then
 fi
 
 name=$(printf '%s\n' "$cands" \
-  | fzf --reverse --info=inline --border=rounded --margin=20%,30% \
-        --prompt='remove worktree ❯ ' \
-        --header='↵ to remove (worktrunk will ask to confirm) · esc to cancel')
+  | fzf --reverse --info=inline-right --border=none --margin=0 \
+        --prompt='Search  ' --pointer='›' --marker='✓' \
+        --header='Enter remove   Esc close   Confirmation follows')
 [[ -z $name ]] && exit 0      # esc / no selection → cancel
 
 # Path and native herdr workspace (if open) of the worktree we're about to remove.

@@ -27,8 +27,10 @@ Three workspace actions:
 - **Worktree: switch / create from default branch** — opens an fzf picker over
   your existing worktrees and local branches without worktrees (remote-tracking
   branches too, if enabled — see [Remote branches in the picker](#remote-branches-in-the-picker)).
-  Press `Enter` on a match to switch to it, or type a new name and press `Enter`
-  to create it from worktrunk's default base branch.
+  Browse the list or type a full branch name, then press `Enter`. Typed searches
+  use exact text matching, so unrelated fuzzy matches are hidden. An existing
+  branch opens, while any new name is created from worktrunk's default base
+  branch.
 
 - **Worktree: switch / create from current branch** — the same picker, but typed
   new branch names are created with `wt switch --create --base @`, i.e. from the
@@ -180,6 +182,7 @@ The plugin is a manifest plus small bash scripts:
 - `remove.sh` — the remove picker + orphaned-pane cleanup
 - `tests/config_test.sh` — configuration parser checks
 - `tests/helpers_test.sh` — helper function checks
+- `tests/picker_test.sh` — exact picker selection checks
 
 herdr caches the manifest when a plugin is linked, so after editing
 `herdr-plugin.toml` you must relink for changes to take effect:

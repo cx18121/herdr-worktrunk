@@ -5,7 +5,8 @@
 # runs your interactive shell, so its `wt` function cd's into the worktree and sticks.
 
 create_base=""
-create_base_label="default branch"
+default_branch=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^[^/]*/||' || true)
+create_base_label=${default_branch:-default}
 case ${1:-} in
   ""|--create-base=default)
     ;;
@@ -35,30 +36,38 @@ source "$plugin_root/config.sh"
 # shellcheck source=./helpers.sh
 source "$plugin_root/helpers.sh"
 
-# Branch refs to offer alongside `wt list`: always local heads, plus
-# remote-tracking branches unless disabled via show_remote_branches = false.
-branch_refs=(refs/heads refs/remotes)
-[[ $(worktrunk_show_remote_branches) == false ]] && branch_refs=(refs/heads)
-
-# fzf over existing worktree branches; --print-query returns a typed-but-unmatched
-# name so we can create it. Falls back to a plain read if fzf isn't on PATH.
+# fzf over existing worktrees and branches. Rows carry a display-only kind so
+# the user can tell what Enter will open. The branch remains the final field.
 if command -v fzf >/dev/null; then
   choice=$(
     {
-      wt list --format=json 2>/dev/null \
-        | jq -r '.[] | select(.branch != null) | .branch'
-      # Drop origin/HEAD: its short form is bare "origin", so filter on the full
-      # refname (refs/remotes/origin/HEAD) instead, then emit the short name.
-      git for-each-ref --format='%(refname) %(refname:short)' "${branch_refs[@]}" 2>/dev/null \
-        | awk '$1 !~ /\/HEAD$/ {print $2}'
-    } | LC_ALL=C sort -u \
-      | fzf --print-query --reverse --info=inline --border=rounded --margin=20%,30% \
-            --prompt='worktree ❯ ' \
-            --header="↵ on a match → switch · type a new name + ↵ → create from ${create_base_label} · esc → cancel"
+      git worktree list --porcelain 2>/dev/null \
+        | awk '$1 == "branch" {sub("^refs/heads/", "", $2); print "1\topen\t" $2}'
+      git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null \
+        | awk '{print "2\tlocal\t" $0}'
+      if [[ $(worktrunk_show_remote_branches) == true ]]; then
+        git for-each-ref --format='%(refname) %(refname:short)' refs/remotes 2>/dev/null \
+          | awk '$1 !~ /\/HEAD$/ {print "3\tremote\t" $2}'
+      fi
+    } \
+      | LC_ALL=C sort -t $'\t' -k3,3 -k1,1n \
+      | awk -F '\t' '!seen[$3]++' \
+      | LC_ALL=C sort -t $'\t' -k1,1n -k3,3 \
+      | cut -f2- \
+      | fzf --print-query --exact --reverse --info=inline-right --border=none --margin=0 \
+            --delimiter=$'\t' --with-nth=1,2 --nth=2 \
+            --prompt='Search  ' --pointer='›' --marker='✓' \
+            --header="Enter open exact/create new   Esc close   Base ${create_base_label}"
   )
   ret=$?
   [[ $ret -gt 1 ]] && exit 0      # 130 = esc/abort → cancel (0 = picked, 1 = typed-new)
-  name=${choice##*$'\n'}          # last line: the selection if any, else the typed query
+  query=${choice%%$'\n'*}
+  selected=${choice##*$'\n'}
+  if [[ -n $query ]]; then
+    name=$query                    # typed names are exact: existing ref or new branch
+  else
+    name=${selected#*$'\t'}       # empty query accepts the browsed selection
+  fi
 else
   printf 'Branch (existing → switch · new → create from %s): ' "$create_base_label"
   read -r name
